@@ -1,9 +1,13 @@
-
+ 
 ;; Added by Package.el.  This must come before configurations of
 ;; installed packages.  Don't delete this line.  If you don't want it,
 ;; just comment it out by adding a semicolon to the start of the line.
 ;; You may delete these explanatory comments.
 (package-initialize)
+
+(setq makescript "build.bat")
+(setq runscript "run.bat")
+(setq compilation-directory-locked nil)
 
 ;; enable melpa packages
 (require 'package)
@@ -54,16 +58,19 @@
                        '(font . "JetBrains Mono NL Regular-12"))
 
 ;; start maximized
-(add-to-list 'initial-frame-alist '(fullscreen . maximized))
+(add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 ;; activate mini-frame-mode
 (mini-frame-mode 1)
 
 (custom-set-variables
- '(mini-frame-show-parameters
-   '((top . 0.3)
-     (width . 0.7)
-     (left . 0.5))))
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(mini-frame-show-parameters '((top . 0.3) (width . 0.7) (left . 0.5) (fullscreen)))
+ '(package-selected-packages
+   '(mini-frame use-package rainbow-mode magit ido-vertical-mode doom-themes company-irony)))
 	 
 ;; activate ido and ido vertical mode
 (require 'ido)
@@ -153,16 +160,83 @@ transpositions to execute in sequence."
 ;;(add-hook 'focus-out-hook 'save-buffer)
 
 
-(custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(package-selected-packages
-   '(mini-frame use-package rainbow-mode magit ido-vertical-mode doom-themes company-irony)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  )
+
+; Compilation
+(defun find-project-directory-recursive ()
+  "Recursively search for a makefile."
+  (interactive)
+  (if (file-exists-p makescript) t
+      (cd "../")
+      (find-project-directory-recursive)))
+
+(defun lock-compilation-directory ()
+  "The compilation process should NOT hunt for a makefile"
+  (interactive)
+  (setq compilation-directory-locked t)
+  (message "Compilation directory is locked."))
+
+(defun unlock-compilation-directory ()
+  "The compilation process SHOULD hunt for a makefile"
+  (interactive)
+  (setq compilation-directory-locked nil)
+  (message "Compilation directory is roaming."))
+
+(defun find-project-directory ()
+  "Find the project directory."
+  (interactive)
+  (setq find-project-from-directory default-directory)
+;  (switch-to-buffer-other-window "*compilation*")
+  (if compilation-directory-locked (cd last-compilation-directory)
+  (cd find-project-from-directory)
+  (find-project-directory-recursive)
+  (setq last-compilation-directory default-directory)))
+
+(defun make-without-asking ()
+  "Make the current build."
+  (interactive)
+  (if (find-project-directory) (compile makescript))
+  (other-window 1))
+(define-key global-map "\em" 'make-without-asking)
+
+; run program
+(defun run-in-shell-buffer ()
+	"Run the current program"
+	(interactive)
+	(shell)
+	;; Goto last prompt, clear old input if any, and insert new one
+	(goto-char (point-max))
+	(comint-kill-input)
+	(if (find-project-directory) (insert runscript))
+	;; Execute
+	(comint-send-input))
+(define-key global-map "\e," 'run-in-shell-buffer)
+	
+; Buffers
+(define-key global-map "\er" 'revert-buffer)
+(define-key global-map "\ek" 'kill-this-buffer)
+(define-key global-map "\es" 'save-buffer)
+
+; smooth scrolling
+(setq scroll-step 3)
+
+; indentation customization
+;(setq-default indent-tabs-mode nil)
+;(setq-default tab-width 4)
+;(setq indent-line-function 'insert-tab)
+(setq-default c-basic-offset 4
+    tab-width 4
+    indent-tabs-mode t)
+
+; always show file name in frame title
+(setq frame-title-format
+      (list (format "%s %%S: %%j " (system-name))
+        '(buffer-file-name "%f" (dired-directory dired-directory "%b"))))
+
+; close shell buffer without confirmation
+(setq kill-buffer-query-functions (delq 'process-kill-buffer-query-function kill-buffer-query-functions))
